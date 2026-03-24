@@ -2103,9 +2103,13 @@ void processKeyEvent(int r, int c, bool isPressed) {
 }
 
 // ==========================================================================
-// --- 主程式 Setup & Loop (無變動) ---
+// --- 主程式 Setup & Loop (優化版) ---
 // ==========================================================================
 void setup() {
+  // [穩定性優化] 將系統時脈鎖定在 120MHz (12MHz 的整數倍)
+  // 這能讓 PIO 模擬 USB 訊號時的波形完全對齊基準，大幅減少通訊錯誤
+  set_sys_clock_khz(120000, true);
+
   Serial.begin(115200);
   // 初始化雙核共享緩衝區
   usb_tx_ring.init();
@@ -2145,7 +2149,14 @@ void setup1() {
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
   pio_cfg.pin_dp = HOST_PIN_DP;
 
+  // [穩定性優化] 強制指定 USBHost 運作在 Core 1
   USBHost.configure_pio_usb(1, &pio_cfg);
+
+  // [穩定性優化] 提升 PIO 中斷優先級至最高 (0)
+  // 防止 Core 0 進行頻繁的螢幕 SPI 繪圖時干擾到 USB 數據的即時接收
+  irq_set_priority(PIO0_IRQ_0, 0); 
+  irq_set_priority(PIO1_IRQ_0, 0);
+
   USBHost.begin(1);  // rhport = 1 (PIO-USB)
 }
 
