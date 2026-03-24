@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:arduino-pico.readthedocs.io)",
+      "WebFetch(domain:learn.adafruit.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:meshtastic.org)",
+      "WebFetch(domain:python.meshtastic.org)"
+    ]
+  }
+}
