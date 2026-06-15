@@ -1703,8 +1703,8 @@ void drawMyInfoContent() {
     y_pos += FONT_HEIGHT + LINE_SPACING;
 
     // 連線狀態
-    sprintf(buf, "連線狀態: %s", g_device_responded ? "已連線" : "未連線");
-    renderer->drawString(MARGIN, y_pos, buf, g_device_responded ? COLOR_STATUS_ONLINE : COLOR_STATUS_STALE);
+    sprintf(buf, "USB: %s / Proto: %s", usb_cdc_mounted ? "掛載" : "未偵測", g_device_responded ? "已連線" : "未連線");
+    renderer->drawString(MARGIN, y_pos, buf, g_device_responded ? COLOR_STATUS_ONLINE : (usb_cdc_mounted ? COLOR_STATUS_STALE : COLOR_STATUS_OFFLINE));
     y_pos += FONT_HEIGHT + LINE_SPACING;
 
     // 區域
@@ -2142,15 +2142,15 @@ void setup() {
 // PIO-USB Host stack 必須在 Core 1 上運行
 // ==========================================================================
 void setup1() {
-  // 等 Core 0 的 setup() 先跑完
-  while (!Serial) delay(10);
+  // [修正] 移除 while (!Serial)，避免在未連接 PC 時導致 Core 1 啟動阻塞，進而觸發 Core 0 的 Watchdog
+  // while (!Serial) delay(10); 
 
   // 設定 PIO-USB 腳位
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
   pio_cfg.pin_dp = HOST_PIN_DP;
 
-  // [穩定性優化] 強制指定 USBHost 運作在 Core 1
-  USBHost.configure_pio_usb(1, &pio_cfg);
+  // [穩定性優化] 改用 PIO 0 實例，這是最通用的設定
+  USBHost.configure_pio_usb(0, &pio_cfg);
 
   // [穩定性優化] 提升 PIO 中斷優先級至最高 (0)
   // 防止 Core 0 進行頻繁的螢幕 SPI 繪圖時干擾到 USB 數據的即時接收
@@ -2158,6 +2158,7 @@ void setup1() {
   irq_set_priority(PIO1_IRQ_0, 0);
 
   USBHost.begin(1);  // rhport = 1 (PIO-USB)
+  Serial.println("[USB] Core 1 PIO-USB Host initialized on PIO 0.");
 }
 
 // Core 1 心跳計數器，讓 Core 0 偵測 Core 1 是否還活著
@@ -2173,14 +2174,13 @@ void loop1() {
   }
 
   // TX: 從 tx_ring 讀出，送到 USB（每次最多 64 bytes，配合 USB endpoint 大小）
+  // 注意：不呼叫 SerialHost.flush()。flush() 在 USB core 上是阻塞等待，會卡住
+  // loop1() 直到 TX 送完，期間打亂 PIO-USB 的 SOF 時序，是觸發 host 卡死的成因之一。
+  // write() 已把資料寫入 CDC TX FIFO，後面緊接的 USBHost.task() 會自然驅動實際傳輸。
   int tx_count = 64;
   while (usb_tx_ring.available() > 0 && tx_count-- > 0) {
     int b = usb_tx_ring.read();
     if (b >= 0) SerialHost.write((uint8_t)b);
-  }
-  // 只在有東西送完後才 flush
-  if (tx_count < 63) {
-    SerialHost.flush();
   }
 
   // 讓 USBHost.task() 再跑一次，處理剛送出的 TX 並接收新的 RX
@@ -2206,6 +2206,7 @@ void loop() {
 
   if (usb_connected && !usb_was_connected) {
     Serial.println("[USB] Device connected, starting handshake...");
+    editor_content += "[USB] 偵測到裝置，開始握手...\n";
     delay(500);  // 等待 CDC 初始化穩定
     initiateConnectionAttempt();
     needs_redraw = true;
@@ -2214,7 +2215,7 @@ void loop() {
     Serial.println("[USB] Device disconnected!");
     // 不設 PHASE_GETTING_ID，避免在 USB 未 mount 時反覆 retry
     // 等 USB 重新 mount 後由 connect 分支啟動握手
-    editor_content += "[USB Disconnected]\n";
+    editor_content += "[USB] 裝置已斷開\n";
     needs_redraw = true;
   }
   usb_was_connected = usb_connected;
