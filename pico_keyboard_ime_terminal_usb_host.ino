@@ -1659,10 +1659,12 @@ void drawChannelListContent() {
 
     renderer->drawString(MARGIN + 150, y_pos, getChannelRoleString(ch.role).c_str(), text_color, bg_color);
 
-    char link_status[5] = "";
-    if (ch.settings.uplink_enabled && ch.settings.downlink_enabled) strcpy(link_status, "↑↓");
-    else if (ch.settings.uplink_enabled) strcpy(link_status, "↑");
-    else if (ch.settings.downlink_enabled) strcpy(link_status, "↓");
+    // ↑ ↓ 各佔 3 bytes（UTF-8），"↑↓" 共 6 bytes 加結尾 NUL 需要 7 ——
+    // 原本宣告成 char[5] 會溢位。這裡全部是字串常值，改用指標即可，不必複製。
+    const char* link_status = "";
+    if (ch.settings.uplink_enabled && ch.settings.downlink_enabled) link_status = "↑↓";
+    else if (ch.settings.uplink_enabled) link_status = "↑";
+    else if (ch.settings.downlink_enabled) link_status = "↓";
     renderer->drawString(MARGIN + 220, y_pos, link_status, text_color, bg_color);
 
     y_pos += FONT_HEIGHT + LINE_SPACING;
