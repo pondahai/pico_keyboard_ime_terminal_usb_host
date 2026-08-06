@@ -117,7 +117,12 @@ const int FONT_HEIGHT = 16;
 const int PADDING = 4;
 const int MARGIN = 5;
 const int LINE_SPACING = 4;
-#define MAX_CHAR_BUFFER_SIZE 256
+// 缺字時的前進量。全形字的 x_advance 是 13，用 FONT_HEIGHT / 2 = 8 會讓
+// drawString 與 getStringWidth 算出不同的寬度，導致排版錯位。
+const int FULLWIDTH_ADVANCE = 13;
+// 由字型資料自行宣告，隨 build_font.py 的產出自動調整。
+// 舊的 1 B/px 標頭檔沒有這個巨集，會在此編譯失敗 —— 這是刻意的防呆。
+#define MAX_CHAR_BUFFER_SIZE PICOTYPE_MAX_GLYPH_BYTES
 uint8_t g_char_bitmap_buffer[MAX_CHAR_BUFFER_SIZE];
 #define PROTO_BUFFER_SIZE 512
 uint8_t proto_tx_buffer[PROTO_BUFFER_SIZE];
@@ -228,7 +233,7 @@ public:
           cursor_x += pgm_read_byte(&record->x_advance);
         } else {
           _tft.drawRect(cursor_x + 2, y + 2, FONT_HEIGHT - 4, FONT_HEIGHT - 4, ILI9341_MAGENTA);
-          cursor_x += FONT_HEIGHT / 2;
+          cursor_x += FULLWIDTH_ADVANCE;
         }
       }
       i += char_len;
@@ -247,7 +252,7 @@ public:
       else {
         const FontMapRecord_Opt* record = findChar(unicode);
         if (record) total_width += pgm_read_byte(&record->x_advance);
-        else total_width += FONT_HEIGHT / 2;
+        else total_width += FULLWIDTH_ADVANCE;
       }
       i += char_len;
     }
@@ -287,14 +292,19 @@ private:
     int8_t x_off = pgm_read_byte(&record->x_offset), y_off = pgm_read_byte(&record->y_offset);
     uint32_t offset = pgm_read_dword(&record->offset);
     if (w == 0 || h == 0) return;
-    size_t buffer_size = (size_t)w * h;
+    // 1 bit/pixel, row-aligned, LSB-first：每列佔 stride 個位元組，
+    // 第 i 個 pixel 位於 byte i / 8 的 bit i % 8。
+    uint8_t stride = (w + 7) / 8;
+    size_t buffer_size = (size_t)stride * h;
     if (buffer_size > MAX_CHAR_BUFFER_SIZE) return;
-    memcpy_P(bitmap_buffer, font_bitmap_data_opt + offset, buffer_size);
+    memcpy_P(bitmap_buffer, font_bitmap_data_1bpp + offset, buffer_size);
     int16_t draw_x = x + x_off, draw_y = y + y_off;
     _tft.startWrite();
-    for (int16_t j = 0; j < h; j++)
+    for (int16_t j = 0; j < h; j++) {
+      const uint8_t* row = bitmap_buffer + (size_t)j * stride;
       for (int16_t i = 0; i < w; i++)
-        if (bitmap_buffer[j * w + i] > 128) _tft.writePixel(draw_x + i, draw_y + j, color);
+        if (row[i >> 3] >> (i & 7) & 1) _tft.writePixel(draw_x + i, draw_y + j, color);
+    }
     _tft.endWrite();
   }
 };
