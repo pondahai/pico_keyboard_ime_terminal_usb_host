@@ -67,3 +67,26 @@ USB Host 跑一段時間後可能整個卡死，由 watchdog 自動整機重啟�
 - **UI 更新**：以 `needs_redraw` flag 優化渲染效能。
 - **記憶體管理**：字型與 IME 資料存於 PROGMEM 以符合 flash 容量。
 - **錯誤處理**：watchdog 在 Core 1（USB）卡死時自動重啟裝置。
+
+## 授權
+
+**GPL-3.0**，見 [`LICENSE`](LICENSE)。
+
+原因是本 repo 收錄了 16 個由 [meshtastic/protobufs](https://github.com/meshtastic/protobufs)
+的 `.proto` 定義產生的檔案（`mesh.pb.*`、`channel.pb.*`、`config.pb.*` 等），
+而該專案為 GPL-3.0，其產生檔是衍生著作。
+
+> 姊妹專案 [pico_keyboard_ime_terminal](https://github.com/pondahai/pico_keyboard_ime_terminal)
+> 不收錄這些檔案、要求使用者自行產生，故其自身程式碼採 MIT。
+
+第三方成分的完整聲明見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)，摘要：
+
+| 成分 | 上游 | 授權 |
+| :--- | :--- | :--- |
+| `*.pb.c` / `*.pb.h` | [meshtastic/protobufs](https://github.com/meshtastic/protobufs) | **GPL-3.0** |
+| `pb_*.c` / `pb.h` | [nanopb](https://github.com/nanopb/nanopb) | Zlib，Copyright (c) 2011 Petteri Aimonen |
+| 注音碼表（`zhuyin_*`） | [McBopomofo](https://github.com/openvanilla/McBopomofo) | MIT，Copyright (c) 2011-2026 Mengjuei Hsieh et al. |
+| 中文字型（`font_*`） | Cubic 11 + Fusion Pixel 12px | SIL OFL 1.1 |
+
+碼表使用的是 `BPMFBase.txt`（單字注音）與 `BPMFPunctuations.txt`（標點）。
+帶有 libtabe（BSD）血統的多字詞庫 `BPMFMappings.txt` **未使用**。
